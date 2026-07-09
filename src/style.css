@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+@keyframes flipIn {
+  from { opacity: 0; transform: perspective(400px) rotateX(80deg); }
+  to { opacity: 1; transform: perspective(400px) rotateX(0); }
+}
+
+.anim-fadeSlideUp { animation: fadeSlideUp 0.5s ease-out both; }
+.anim-fadeIn { animation: fadeIn 0.5s ease-out both; }
+.anim-slideRight { animation: slideRight 0.5s ease-out both; }
+.anim-scaleIn { animation: scaleIn 0.4s ease-out both; }
+.anim-bounceIn { animation: bounceIn 0.6s ease-out both; }
+.anim-flipIn { animation: flipIn 0.6s ease-out both; }
+
+@keyframes typing {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.anim-typing {
+  animation: typing 0.8s steps(30, end) both;
+}
