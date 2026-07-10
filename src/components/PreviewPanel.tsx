@@ -7,7 +7,7 @@ function speak(text: string, rate = 0.9) {
   const utter = new SpeechSynthesisUtterance(text)
   const isArabic = /[\u0600-\u06FF]/.test(text)
   utter.lang = isArabic ? 'ar-SA' : 'en-US'
-  utter.rate = rate
+  utter.rate = isArabic ? 1 : rate
   window.speechSynthesis.speak(utter)
 }
 
@@ -17,7 +17,7 @@ function speakSequential(texts: string[], rate = 0.9) {
     const utter = new SpeechSynthesisUtterance(text)
     const isArabic = /[\u0600-\u06FF]/.test(text)
     utter.lang = isArabic ? 'ar-SA' : 'en-US'
-    utter.rate = rate
+    utter.rate = isArabic ? 1 : rate
     window.speechSynthesis.speak(utter)
   })
 }
