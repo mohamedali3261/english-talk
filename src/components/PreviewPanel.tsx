@@ -59,26 +59,31 @@ export default function PreviewPanel({
   const [arVoices, setArVoices] = useState<SpeechSynthesisVoice[]>([])
   const [arVoiceName, setArVoiceName] = useState('')
 
-  useEffect(() => {
-    const load = () => {
-      const voices = window.speechSynthesis?.getVoices() ?? []
-      const ar = voices.filter(v => v.lang.startsWith('ar'))
-      setArVoices(ar)
-      if (ar.length > 0 && !arVoiceName) setArVoiceName(ar[0].name)
-    }
-    load()
-    window.speechSynthesis?.addEventListener('voiceschanged', load)
-    return () => window.speechSynthesis?.removeEventListener('voiceschanged', load)
-  }, [])
-
-  const tryLoadVoices = () => {
+  const loadVoices = () => {
     const voices = window.speechSynthesis?.getVoices() ?? []
     const ar = voices.filter(v => v.lang.startsWith('ar'))
     if (ar.length > 0) {
       setArVoices(ar)
-      if (!arVoiceName) setArVoiceName(ar[0].name)
+      setArVoiceName(prev => prev || ar[0].name)
     }
+    return ar
   }
+
+  useEffect(() => {
+    loadVoices()
+    window.speechSynthesis?.addEventListener('voiceschanged', loadVoices)
+    const forceLoad = () => {
+      const u = new SpeechSynthesisUtterance(' ')
+      u.volume = 0
+      window.speechSynthesis?.speak(u)
+      setTimeout(() => { window.speechSynthesis?.cancel(); loadVoices() }, 200)
+    }
+    document.addEventListener('click', forceLoad, { once: true })
+    return () => {
+      window.speechSynthesis?.removeEventListener('voiceschanged', loadVoices)
+      document.removeEventListener('click', forceLoad)
+    }
+  }, [])
 
   const arVoice = arVoices.find(v => v.name === arVoiceName) ?? null
 
@@ -124,7 +129,7 @@ export default function PreviewPanel({
             className="w-20 h-1 accent-emerald-400 cursor-pointer" />
           <span className="text-emerald-400/80 text-[11px] w-7 text-center font-mono">{speechRate.toFixed(1)}x</span>
         </div>
-        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5" onClick={tryLoadVoices}>
+        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5" onClick={loadVoices}>
           <span className="text-[10px] text-white/40 font-medium">AR</span>
           {arVoices.length > 0 ? (
             <select value={arVoiceName} onChange={e => setArVoiceName(e.target.value)}
