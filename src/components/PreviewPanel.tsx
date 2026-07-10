@@ -220,7 +220,7 @@ export default function PreviewPanel({
                 const hasAnyContent = visibleTypes.length > 0
                 if (hasAnyContent) {
                   items.push(
-                    <div key={`box-${s.id}-${pk}`} className="bg-white/[0.07] rounded-xl px-3 py-1.5 border border-white/10">
+                    <div key={`box-${s.id}-${pk}`} className="bg-white/[0.07] rounded-xl px-3 py-1.5 border border-white/10 flex flex-col gap-1.5">
                       {visibleTypes.includes('translation') && (
                         <SectionItem section={s} type="translation" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} speechRate={speechRate} arVoice={arVoice} cls={presentMode && sectionStart + types.indexOf('translation') === presentIndex || previewTriggered ? transition : ''} />
                       )}
