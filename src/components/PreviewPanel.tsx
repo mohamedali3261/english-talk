@@ -63,15 +63,22 @@ export default function PreviewPanel({
     const load = () => {
       const voices = window.speechSynthesis?.getVoices() ?? []
       const ar = voices.filter(v => v.lang.startsWith('ar'))
-      if (ar.length > 0) {
-        setArVoices(ar)
-        if (!arVoiceName) setArVoiceName(ar[0].name)
-      }
+      setArVoices(ar)
+      if (ar.length > 0 && !arVoiceName) setArVoiceName(ar[0].name)
     }
     load()
     window.speechSynthesis?.addEventListener('voiceschanged', load)
     return () => window.speechSynthesis?.removeEventListener('voiceschanged', load)
   }, [])
+
+  const tryLoadVoices = () => {
+    const voices = window.speechSynthesis?.getVoices() ?? []
+    const ar = voices.filter(v => v.lang.startsWith('ar'))
+    if (ar.length > 0) {
+      setArVoices(ar)
+      if (!arVoiceName) setArVoiceName(ar[0].name)
+    }
+  }
 
   const arVoice = arVoices.find(v => v.name === arVoiceName) ?? null
 
@@ -117,17 +124,19 @@ export default function PreviewPanel({
             className="w-20 h-1 accent-emerald-400 cursor-pointer" />
           <span className="text-emerald-400/80 text-[11px] w-7 text-center font-mono">{speechRate.toFixed(1)}x</span>
         </div>
-        {arVoices.length > 1 && (
-          <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5">
-            <span className="text-[10px] text-white/40 font-medium">AR</span>
+        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5" onClick={tryLoadVoices}>
+          <span className="text-[10px] text-white/40 font-medium">AR</span>
+          {arVoices.length > 0 ? (
             <select value={arVoiceName} onChange={e => setArVoiceName(e.target.value)}
               className="bg-transparent text-white text-[11px] rounded-md px-1.5 py-0.5 outline-none cursor-pointer border border-white/10 hover:border-white/25 transition-colors">
               {arVoices.map(v => (
                 <option key={v.name} value={v.name} className="bg-gray-800 text-white">{v.name.replace(/Arabic.*$/, '').trim() || v.name}</option>
               ))}
             </select>
-          </div>
-        )}
+          ) : (
+            <span className="text-[11px] text-white/30">الصوت الافتراضي</span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 bg-white/5 rounded-xl px-3 py-1.5">
