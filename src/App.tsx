@@ -21,8 +21,6 @@ export default function App() {
   const [elementSizes, setElementSizes] = useState<Record<ElementKey, number>>({})
   const [selectedElement, setSelectedElement] = useState<ElementKey | null>(null)
   const [bgIndex, setBgIndex] = useState(0)
-  const [speechRate, setSpeechRate] = useState(0.9)
-  const [voiceGender, setVoiceGender] = useState<'male' | 'female' | 'auto'>('auto')
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview' | 'templates'>('edit')
 
   const getSize = (key: ElementKey) => elementSizes[key] ?? 100
@@ -107,10 +105,6 @@ export default function App() {
           getSize={getSize}
           setElementSizes={setElementSizes}
           bgIndex={bgIndex}
-          speechRate={speechRate}
-          setSpeechRate={setSpeechRate}
-          voiceGender={voiceGender}
-          setVoiceGender={setVoiceGender}
         />
       </div>
       <div className={`${mobileTab !== 'templates' ? 'hidden md:flex' : 'flex'} md:flex flex-col flex-1 md:flex-none md:shrink-0 min-h-0`}>

@@ -1,7 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Section, ElementKey } from '../types.ts'
-import { speak } from '../utils.ts'
 
 export default function PreviewSection({
   section,
@@ -35,7 +34,7 @@ export default function PreviewSection({
       <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
         {section.title ? (
           <div
-            onClick={(e) => { e.stopPropagation(); onSelect(eTitle); speak(section.title, 'ar-SA') }}
+            onClick={(e) => { e.stopPropagation(); onSelect(eTitle) }}
             className={`px-4 py-3 w-full rounded-2xl bg-white/5 border transition-all text-center cursor-pointer ${selectedElement === eTitle ? 'border-blue-400 ring-2 ring-blue-400' : 'border-white/10'}`}
           >
             <h2
@@ -50,7 +49,7 @@ export default function PreviewSection({
 
       {section.sentence && (
         <div
-          onClick={(e) => { e.stopPropagation(); onSelect(eSentence); speak(section.sentence, 'en-US') }}
+          onClick={(e) => { e.stopPropagation(); onSelect(eSentence) }}
           className={`p-5 w-full rounded-2xl bg-white/5 border transition-all text-center cursor-pointer ${selectedElement === eSentence ? 'border-blue-400 ring-2 ring-blue-400' : 'border-white/10'}`}
         >
           <p
@@ -62,7 +61,7 @@ export default function PreviewSection({
       )}
       {section.translation && (
         <div
-          onClick={(e) => { e.stopPropagation(); onSelect(eTranslation); speak(section.translation, 'ar-SA') }}
+          onClick={(e) => { e.stopPropagation(); onSelect(eTranslation) }}
           className={`p-5 w-full rounded-2xl bg-white/5 border transition-all text-center cursor-pointer ${selectedElement === eTranslation ? 'border-blue-400 ring-2 ring-blue-400' : 'border-white/10'}`}
         >
           <p
