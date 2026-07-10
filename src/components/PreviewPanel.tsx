@@ -71,7 +71,9 @@ export default function PreviewPanel({
     setRevealedCount(c => Math.max(c, presentIndex))
     const { section: s, type } = slides[presentIndex]
     setSelectedElement(type === 'translation' ? `translation-${s.id}` : `sentence-${s.id}`)
-  }, [presentMode, presentIndex, slides, maxIndex])
+    if (type === 'translation' && s.translation) speak(s.translation, speechRate)
+    else if (type === 'sentence' && s.sentence) speak(s.sentence, speechRate)
+  }, [presentMode, presentIndex, slides, maxIndex, speechRate])
 
   const enterPresent = () => { setPresentMode(true); setPresentIndex(0); setRevealedCount(0) }
   const exitPresent = () => { setPresentMode(false); setPresentIndex(0); setRevealedCount(0) }
