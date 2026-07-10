@@ -101,7 +101,7 @@ export default function PreviewPanel({
   const goNext = () => setPresentIndex(i => Math.min(maxIndex, i + 1))
 
   return (
-    <div className="flex-1 flex flex-col items-center gap-4 p-4 md:p-8 overflow-y-auto">
+    <div className="flex-1 flex flex-col items-center gap-3 p-4 md:p-8 overflow-y-auto">
       <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2">
         <button onClick={() => selEl && changeSize(selEl, -10)} className={`text-lg w-7 h-7 rounded-lg transition-all ${selEl ? 'text-white/70 hover:bg-white/20' : 'text-white/20'} bg-white/10`}>A−</button>
         <span className="text-white/60 text-xs w-10 text-center">{selEl ? `${getSize(selEl)}%` : '—'}</span>
@@ -109,22 +109,24 @@ export default function PreviewPanel({
         <button onClick={() => selEl && setElementSizes((prev) => { const n = { ...prev }; delete n[selEl]; return n; })} className="text-white/40 hover:text-white text-xs ml-1 transition-all">Reset</button>
       </div>
 
-      <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2">
-        <span className="text-[10px] text-white/50 font-medium">Voice</span>
-        <input type="range" min="0.2" max="1.5" step="0.1" value={speechRate}
-          onChange={e => setSpeechRate(+e.target.value)}
-          className="w-24 h-1 accent-emerald-400 cursor-pointer" />
-        <span className="text-white/70 text-xs w-9 text-center font-mono">{speechRate.toFixed(1)}x</span>
+      <div className="flex flex-wrap items-center justify-center gap-2 bg-white/5 rounded-2xl px-4 py-2.5 border border-white/[0.06]">
+        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5">
+          <span className="text-[10px] text-white/40 font-medium">EN</span>
+          <input type="range" min="0.2" max="1.5" step="0.1" value={speechRate}
+            onChange={e => setSpeechRate(+e.target.value)}
+            className="w-20 h-1 accent-emerald-400 cursor-pointer" />
+          <span className="text-emerald-400/80 text-[11px] w-7 text-center font-mono">{speechRate.toFixed(1)}x</span>
+        </div>
         {arVoices.length > 1 && (
-          <>
-            <span className="text-white/20 text-xs mx-1">|</span>
+          <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5">
+            <span className="text-[10px] text-white/40 font-medium">AR</span>
             <select value={arVoiceName} onChange={e => setArVoiceName(e.target.value)}
-              className="bg-white/10 text-white text-[11px] rounded-md px-2 py-1 outline-none cursor-pointer border border-white/10 hover:border-white/20">
+              className="bg-transparent text-white text-[11px] rounded-md px-1.5 py-0.5 outline-none cursor-pointer border border-white/10 hover:border-white/25 transition-colors">
               {arVoices.map(v => (
-                <option key={v.name} value={v.name} className="bg-gray-800">{v.name.replace(/Arabic.*$/, '').trim() || v.name}</option>
+                <option key={v.name} value={v.name} className="bg-gray-800 text-white">{v.name.replace(/Arabic.*$/, '').trim() || v.name}</option>
               ))}
             </select>
-          </>
+          </div>
         )}
       </div>
 
