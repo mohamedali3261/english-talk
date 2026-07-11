@@ -1,9 +1,9 @@
-import { useState, useMemo, type ReactNode } from 'react'
+import { useState, useMemo, useEffect, useRef, type ReactNode } from 'react'
 import type { Section, ElementKey } from '../types.ts'
 import { backgrounds } from '../constants.ts'
 import { useSpeech } from '../utils/useSpeech.ts'
 
-type Slide = { sectionIdx: number; type: 'translation' | 'sentence'; section: Section }
+type Slide = { sectionIdx: number; type: 'title' | 'translation' | 'sentence' | 'word'; section: Section; wordIndex?: number }
 
 interface PreviewPanelProps {
   sections: Section[]
@@ -31,26 +31,59 @@ export default function PreviewPanel({
 }: PreviewPanelProps) {
   const [presentMode, setPresentMode] = useState(false)
   const [presentIndex, setPresentIndex] = useState(0)
-  const [revealedCount, setRevealedCount] = useState(0)
-  const [transition, setTransition] = useState('anim-fadeSlideUp')
+  const [transition, setTransition] = useState('anim-typing')
   const [previewKey, setPreviewKey] = useState(0)
-  const { voices, selectedVoice, setSelectedVoice, selectedArVoice, setSelectedArVoice, speak, stop, isPlaying, playingId } = useSpeech()
+  const { voices, selectedVoice, setSelectedVoice, selectedArVoice, setSelectedArVoice, enRate, setEnRate, speak, stop, isPlaying, playingId } = useSpeech()
+  const lastSpokenRef = useRef<string | null>(null)
 
   const slides = useMemo(() => {
     const result: Slide[] = []
     sections.forEach((s, i) => {
+      if (s.title) result.push({ sectionIdx: i, type: 'title', section: s })
       if (s.translation) result.push({ sectionIdx: i, type: 'translation', section: s })
       if (s.sentence) result.push({ sectionIdx: i, type: 'sentence', section: s })
+      const words = s.words.filter(w => w.en || w.ar)
+      words.forEach((_, wi) => {
+        result.push({ sectionIdx: i, type: 'word', section: s, wordIndex: wi })
+      })
     })
     return result
   }, [sections])
 
   const maxIndex = slides.length - 1
 
-  const enterPresent = () => { setPresentMode(true); setPresentIndex(0); setRevealedCount(0) }
-  const exitPresent = () => { setPresentMode(false); setPresentIndex(0); setRevealedCount(0) }
-  const goPrev = () => setPresentIndex(i => Math.max(0, i - 1))
-  const goNext = () => setPresentIndex(i => Math.min(maxIndex, i + 1))
+  useEffect(() => {
+    if (!presentMode) return
+    const current = slides[presentIndex]
+    if (!current) return
+    if (current.type === 'sentence' && current.section.sentence) {
+      const id = `present-sentence-${current.section.id}`
+      if (lastSpokenRef.current !== id) {
+        lastSpokenRef.current = id
+        setTimeout(() => speak(current.section.sentence, id, 'en'), 300)
+      }
+    } else if (current.type === 'translation' && current.section.translation) {
+      const id = `present-translation-${current.section.id}`
+      if (lastSpokenRef.current !== id) {
+        lastSpokenRef.current = id
+        setTimeout(() => speak(current.section.translation, id, 'ar'), 300)
+      }
+    } else if (current.type === 'word' && current.wordIndex !== undefined) {
+      const word = current.section.words.filter(w => w.en || w.ar)[current.wordIndex]
+      if (word) {
+        const id = `present-word-${word.id}`
+        if (lastSpokenRef.current !== id) {
+          lastSpokenRef.current = id
+          setTimeout(() => speak(word.en, id, 'en'), 300)
+        }
+      }
+    }
+  }, [presentIndex, presentMode, slides])
+
+  const enterPresent = () => { setPresentMode(true); setPresentIndex(0); lastSpokenRef.current = null }
+  const exitPresent = () => { setPresentMode(false); setPresentIndex(0); stop(); lastSpokenRef.current = null }
+  const goPrev = () => { setPresentIndex(i => Math.max(0, i - 1)); lastSpokenRef.current = null }
+  const goNext = () => { setPresentIndex(i => Math.min(maxIndex, i + 1)); lastSpokenRef.current = null }
 
   return (
     <div className="flex-1 flex flex-col items-center gap-3 p-4 md:p-8 overflow-y-auto">
@@ -86,6 +119,18 @@ export default function PreviewPanel({
             </option>
           ))}
         </select>
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-white/40">{enRate.toFixed(1)}x</span>
+          <input
+            type="range"
+            min="0.3"
+            max="1.5"
+            step="0.1"
+            value={enRate}
+            onChange={(e) => setEnRate(parseFloat(e.target.value))}
+            className="w-16 h-1 accent-blue-400"
+          />
+        </div>
         <span className="text-[10px] text-white/40 font-medium">AR</span>
         <select
           value={selectedArVoice}
@@ -139,7 +184,7 @@ export default function PreviewPanel({
           <span className="absolute top-[82%] right-[10%] rotate-[15deg] text-rose-400">☆</span>
         </div>
 
-        <div className="absolute top-0 left-0 right-0 z-20 flex justify-center pt-3 pointer-events-none">
+        <div className="absolute top-0 left-0 right-0 z-20 flex justify-center -mt-5 pointer-events-none">
           <img src="/lo.png" className="w-[150px] h-auto object-contain opacity-80" />
         </div>
 
@@ -148,45 +193,70 @@ export default function PreviewPanel({
             <p className="text-white/30 text-sm text-center">Add a template or section</p>
           ) : (
             (() => {
-              let slideAcc = 0
               const pk = previewKey > 0 ? previewKey : ''
               return sections.flatMap((s) => {
-                const types: ('translation' | 'sentence')[] = []
-                if (s.translation) types.push('translation')
-                if (s.sentence) types.push('sentence')
-                const sectionStart = slideAcc
-                slideAcc += types.length
-                if (presentMode && sectionStart > revealedCount) return []
-                const previewTriggered = !presentMode && previewKey > 0
                 const items: ReactNode[] = []
-                if (s.title) {
+                const titleSlideIdx = slides.findIndex(sl => sl.type === 'title' && sl.section.id === s.id)
+                const sentenceSlideIdx = slides.findIndex(sl => sl.type === 'sentence' && sl.section.id === s.id)
+                const translationSlideIdx = slides.findIndex(sl => sl.type === 'translation' && sl.section.id === s.id)
+
+                const previewTriggered = !presentMode && previewKey > 0
+                const showTitle = !presentMode || presentIndex >= titleSlideIdx
+                const showSentence = !presentMode || (sentenceSlideIdx >= 0 && presentIndex >= sentenceSlideIdx)
+                const showTranslation = !presentMode || (translationSlideIdx >= 0 && presentIndex >= translationSlideIdx)
+
+                if (s.title && showTitle) {
                   items.push(
-                    <SectionTitle key={`title-${s.id}-${pk}`} section={s} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} cls={presentMode && sectionStart === presentIndex || previewTriggered ? transition : ''} />
+                    <SectionTitle key={`title-${s.id}-${pk}`} section={s} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize}
+                      cls={presentMode && presentIndex === titleSlideIdx || previewTriggered ? transition : ''} highlight={presentMode && presentIndex === titleSlideIdx} />
                   )
                 }
-                const visibleTypes = presentMode ? types.filter((_, ti) => sectionStart + ti <= revealedCount) : types
-                const hasAnyContent = visibleTypes.length > 0
-                if (hasAnyContent) {
+
+                const hasContent = showSentence || showTranslation
+                if (hasContent) {
                   items.push(
                     <div key={`box-${s.id}-${pk}`} className="bg-white/[0.07] rounded-xl px-3 py-1.5 border border-white/10 flex flex-col gap-1.5">
-                      {visibleTypes.includes('translation') && (
-                        <SectionItem section={s} type="translation" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} cls={presentMode && sectionStart + types.indexOf('translation') === presentIndex || previewTriggered ? transition : ''} speak={speak} isPlaying={isPlaying} playingId={playingId} />
+                      {showTranslation && s.translation && (
+                        <SectionItem section={s} type="translation" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize}
+                          cls={presentMode && presentIndex === translationSlideIdx || previewTriggered ? transition : ''} highlight={presentMode && presentIndex === translationSlideIdx} speak={speak} isPlaying={isPlaying} playingId={playingId} />
                       )}
-                      {visibleTypes.includes('sentence') && (
-                        <SectionItem section={s} type="sentence" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} cls={presentMode && sectionStart + types.indexOf('sentence') === presentIndex || previewTriggered ? transition : ''} speak={speak} isPlaying={isPlaying} playingId={playingId} />
+                      {showSentence && s.sentence && (
+                        <SectionItem section={s} type="sentence" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize}
+                          cls={presentMode && presentIndex === sentenceSlideIdx || previewTriggered ? transition : ''} highlight={presentMode && presentIndex === sentenceSlideIdx} speak={speak} isPlaying={isPlaying} playingId={playingId} />
                       )}
                     </div>
                   )
                 }
                 const words = s.words.filter(w => w.en || w.ar)
-                if (words.length > 0) items.push(
-                  <div key={`words-${s.id}-${pk}`} className="flex flex-col items-center gap-1">
-                    <p className="text-[10px] text-white/30 font-medium">— تفكيك الجملة —</p>
-                    {words.map(w => (
-                      <WordItem key={`${w.id}-${pk}`} word={w} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} />
-                    ))}
-                  </div>
-                )
+                if (words.length > 0) {
+                  const wordSlideStart = slides.findIndex(sl => sl.type === 'word' && sl.section.id === s.id)
+                  if (wordSlideStart >= 0) {
+                    const visibleWordCount = presentMode
+                      ? Math.max(0, Math.min(words.length, presentIndex - wordSlideStart + 1))
+                      : words.length
+                    const showWords = !presentMode || (presentIndex >= wordSlideStart)
+                    if (showWords && visibleWordCount > 0) {
+                      items.push(
+                        <div key={`words-${s.id}-${pk}`} className="flex flex-col items-center gap-1">
+                          <p className="text-[10px] text-white/30 font-medium">— تفكيك الجملة —</p>
+                          {words.slice(0, visibleWordCount).map((w, wi) => (
+                            <WordItem key={`${w.id}-${pk}`} word={w} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize}
+                              cls={presentMode && presentIndex === wordSlideStart + wi ? transition : ''} highlight={presentMode && presentIndex === wordSlideStart + wi} />
+                          ))}
+                        </div>
+                      )
+                    }
+                  } else if (!presentMode) {
+                    items.push(
+                      <div key={`words-${s.id}-${pk}`} className="flex flex-col items-center gap-1">
+                        <p className="text-[10px] text-white/30 font-medium">— تفكيك الجملة —</p>
+                        {words.map(w => (
+                          <WordItem key={`${w.id}-${pk}`} word={w} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} />
+                        ))}
+                      </div>
+                    )
+                  }
+                }
                 return items
               })
             })()
@@ -197,20 +267,20 @@ export default function PreviewPanel({
   )
 }
 
-function SectionTitle({ section: s, selectedElement, setSelectedElement, getSize, cls = '' }: {
-  section: Section; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; cls?: string
+function SectionTitle({ section: s, selectedElement, setSelectedElement, getSize, cls = '', highlight = false }: {
+  section: Section; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; cls?: string; highlight?: boolean
 }) {
   const eKey = `title-${s.id}`
   const active = selectedElement === eKey
   return (
-    <p className={`text-center font-bold transition-all cursor-pointer px-3 py-1 rounded-lg ${cls} ${active ? 'text-green-300 bg-green-500/15 ring-1 ring-green-400/40' : 'text-white/70'}`}
-      style={{ fontSize: `${getSize(eKey) * 0.016}rem` }}
+    <p className={`text-center font-bold transition-all cursor-pointer px-3 py-1 rounded-lg drop-shadow-lg ${cls} ${active ? 'text-green-300 bg-green-500/15 ring-1 ring-green-400/40' : 'text-white/70'}`}
+      style={{ fontSize: `${getSize(eKey) * 0.016}rem`, textShadow: highlight ? '0 0 12px rgba(16,185,129,0.8), 0 0 24px rgba(16,185,129,0.4)' : active ? '0 2px 8px rgba(16,185,129,0.4)' : 'none' }}
       onClick={(e) => { e.stopPropagation(); setSelectedElement(eKey) }}>{s.title}</p>
   )
 }
 
-function SectionItem({ section: s, type, selectedElement, setSelectedElement, getSize, cls = '', speak, isPlaying, playingId }: {
-  section: Section; type: 'sentence' | 'translation'; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; cls?: string; speak?: (text: string, id: string, lang?: 'en' | 'ar') => void; isPlaying?: boolean; playingId?: string | null
+function SectionItem({ section: s, type, selectedElement, setSelectedElement, getSize, cls = '', highlight = false, speak, isPlaying, playingId }: {
+  section: Section; type: 'sentence' | 'translation'; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; cls?: string; highlight?: boolean; speak?: (text: string, id: string, lang?: 'en' | 'ar') => void; isPlaying?: boolean; playingId?: string | null
 }) {
   const text = type === 'sentence' ? s.sentence : s.translation
   if (!text) return null
@@ -219,10 +289,11 @@ function SectionItem({ section: s, type, selectedElement, setSelectedElement, ge
   const isAr = type === 'translation'
   const playId = `${type}-${s.id}`
   const isCurrentlyPlaying = isPlaying && playingId === playId
+  const greenShadow = highlight ? '0 0 12px rgba(16,185,129,0.8), 0 0 24px rgba(16,185,129,0.4)' : isAr ? '0 2px 8px rgba(16,185,129,0.4)' : '0 2px 8px rgba(255,255,255,0.3)'
   return (
     <div className="relative group">
-      <p className={`text-center leading-tight font-medium transition-all cursor-pointer rounded-lg ${cls} ${active ? 'text-green-300 bg-green-500/15 ring-1 ring-green-400/40' : isAr ? 'text-emerald-300/90' : 'text-white'}`}
-        style={{ fontSize: `${getSize(eKey) * (isAr ? 0.013 : 0.014)}rem` }}
+      <p className={`text-center leading-tight font-medium transition-all cursor-pointer rounded-lg drop-shadow-lg ${cls} ${active ? 'text-green-300 bg-green-500/15 ring-1 ring-green-400/40' : isAr ? 'text-emerald-300/90' : 'text-white'}`}
+        style={{ fontSize: `${getSize(eKey) * (isAr ? 0.013 : 0.014)}rem`, textShadow: greenShadow }}
         onClick={(e) => {
           e.stopPropagation()
           setSelectedElement(eKey)
@@ -248,17 +319,17 @@ function SectionItem({ section: s, type, selectedElement, setSelectedElement, ge
   )
 }
 
-function WordItem({ word: w, selectedElement, setSelectedElement, getSize }: {
-  word: { id: string; en: string; ar: string }; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number
+function WordItem({ word: w, selectedElement, setSelectedElement, getSize, cls = '', highlight = false }: {
+  word: { id: string; en: string; ar: string }; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; cls?: string; highlight?: boolean
 }) {
   const eKey = `word-${w.id}`
   const active = selectedElement === eKey
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 border transition-all cursor-pointer ${
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 border transition-all cursor-pointer drop-shadow-lg ${cls} ${
         active ? 'bg-green-500/15 border-green-400/40 ring-1 ring-green-400/40' : 'bg-white/[0.06] border-white/10 hover:border-white/20'
       }`}
-      style={{ fontSize: `${getSize(eKey) * 0.013}rem` }}
+      style={{ fontSize: `${getSize(eKey) * 0.013}rem`, textShadow: highlight ? '0 0 12px rgba(16,185,129,0.8), 0 0 24px rgba(16,185,129,0.4)' : 'none' }}
       onClick={(e) => { e.stopPropagation(); setSelectedElement(eKey) }}
     >
       <span className={`transition-colors ${active ? 'text-green-300' : 'text-white'}`}>{w.en}</span>

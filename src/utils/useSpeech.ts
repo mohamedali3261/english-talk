@@ -10,6 +10,7 @@ export function useSpeech() {
   const [voices, setVoices] = useState<SpeechVoice[]>([])
   const [selectedVoice, setSelectedVoice] = useState<string>('')
   const [selectedArVoice, setSelectedArVoice] = useState<string>('')
+  const [enRate, setEnRate] = useState(0.7)
   const [isPlaying, setIsPlaying] = useState(false)
   const [playingId, setPlayingId] = useState<string | null>(null)
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null)
@@ -65,7 +66,7 @@ export function useSpeech() {
       if (matchVoice) utterance.voice = matchVoice
       utterance.lang = voice.lang
     }
-    utterance.rate = 0.9
+    utterance.rate = lang === 'ar' ? 0.9 : enRate
     utterance.pitch = 1
 
     utterance.onstart = () => {
@@ -97,6 +98,8 @@ export function useSpeech() {
     setSelectedVoice,
     selectedArVoice,
     setSelectedArVoice,
+    enRate,
+    setEnRate,
     speak,
     stop,
     isPlaying,
