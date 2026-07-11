@@ -33,69 +33,32 @@ const voices = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'A
 export const GOOGLE_VOICES = voices
 
 async function fetchTts(text: string, apiKey: string, voiceName: string): Promise<ArrayBuffer> {
-  console.log('[GoogleTTS] Requesting:', { text: text.slice(0, 50), voiceName })
-
-  // Try Interactions API first
-  let res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      model: 'gemini-2.5-flash-preview-tts',
-      input: text,
-      response_format: { type: 'audio' },
-      generation_config: {
-        speech_config: [{ voice: voiceName }]
-      }
-    })
-  })
-
-  console.log('[GoogleTTS] Interactions API status:', res.status)
-
-  // If interactions API fails, try generateContent
-  if (!res.ok) {
-    console.log('[GoogleTTS] Trying generateContent fallback...')
-    res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text }] }],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName }
-              }
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName }
             }
           }
-        })
-      }
-    )
-    console.log('[GoogleTTS] generateContent status:', res.status)
-  }
-
+        }
+      })
+    }
+  )
   if (!res.ok) {
-    const errText = await res.text().catch(() => '')
-    console.error('[GoogleTTS] Error:', errText)
-    throw new Error(`Google TTS ${res.status}: ${errText.slice(0, 300)}`)
+    const err = await res.json().catch(() => null)
+    const msg = err?.error?.message || res.statusText
+    throw new Error(`Google TTS ${res.status}: ${msg}`)
   }
-
   const data = await res.json()
-  console.log('[GoogleTTS] Response keys:', Object.keys(data))
-
-  const audioB64 = data.output_audio?.data
-    || data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
-
-  if (!audioB64) {
-    console.error('[GoogleTTS] No audio in:', JSON.stringify(data).slice(0, 500))
-    throw new Error('No audio data in response')
-  }
-
-  console.log('[GoogleTTS] Got audio, size:', audioB64.length)
+  const audioB64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
+  if (!audioB64) throw new Error('No audio data in response')
   return Uint8Array.from(atob(audioB64), c => c.charCodeAt(0)).buffer
 }
 
