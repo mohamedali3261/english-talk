@@ -67,11 +67,11 @@ export default function PreviewPanel({
   useEffect(() => { localStorage.setItem('google_tts_key', googleApiKey) }, [googleApiKey])
 
   const speak = googleTts && googleApiKey
-    ? (text: string) => { setGoogleLoading(true); speakGoogle(text, googleApiKey, googleVoice).finally(() => setGoogleLoading(false)) }
+    ? (text: string) => { setGoogleLoading(true); speakGoogle(text, googleApiKey, googleVoice).catch(e => console.error('[TTS Error]', e)).finally(() => setGoogleLoading(false)) }
     : (text: string) => speakLocal(text, speechRate, arVoice)
 
   const speakSeq = googleTts && googleApiKey
-    ? (texts: string[]) => { setGoogleLoading(true); speakSequentialGoogle(texts, googleApiKey, googleVoice).finally(() => setGoogleLoading(false)) }
+    ? (texts: string[]) => { setGoogleLoading(true); speakSequentialGoogle(texts, googleApiKey, googleVoice).catch(e => console.error('[TTS Error]', e)).finally(() => setGoogleLoading(false)) }
     : (texts: string[]) => speakSequentialLocal(texts, speechRate, arVoice)
 
   const loadVoices = () => {
