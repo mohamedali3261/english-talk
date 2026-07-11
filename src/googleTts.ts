@@ -34,7 +34,7 @@ export const GOOGLE_VOICES = voices
 
 async function fetchTts(text: string, apiKey: string, voiceName: string): Promise<ArrayBuffer> {
   console.log('[GoogleTTS] Requesting:', { text: text.slice(0, 50), voiceName })
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-tts:generateContent?key=${apiKey}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`
   console.log('[GoogleTTS] URL:', url.replace(apiKey, '***'))
   const res = await fetch(url, {
     method: 'POST',
