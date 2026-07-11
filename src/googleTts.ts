@@ -32,31 +32,38 @@ const voices = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'A
 
 export const GOOGLE_VOICES = voices
 
-export async function speakGoogle(text: string, apiKey: string, voiceName = 'Kore'): Promise<void> {
-  stopGoogleTts()
+async function fetchTts(text: string, apiKey: string, voiceName: string): Promise<ArrayBuffer> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-tts:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/interactions`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName }
-            }
-          }
+        model: 'gemini-2.5-flash-preview-tts',
+        input: text,
+        response_format: { type: 'audio' },
+        generation_config: {
+          speech_config: [{ voice: voiceName }]
         }
       })
     }
   )
-  if (!res.ok) throw new Error(`Google TTS error: ${res.status}`)
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(`Google TTS ${res.status}: ${errText.slice(0, 200)}`)
+  }
   const data = await res.json()
-  const audioB64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
-  if (!audioB64) throw new Error('No audio in response')
-  const pcm = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0)).buffer
+  const audioB64 = data.output_audio?.data || data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
+  if (!audioB64) throw new Error('No audio data in response')
+  return Uint8Array.from(atob(audioB64), c => c.charCodeAt(0)).buffer
+}
+
+export async function speakGoogle(text: string, apiKey: string, voiceName = 'Kore'): Promise<void> {
+  stopGoogleTts()
+  const pcm = await fetchTts(text, apiKey, voiceName)
   const wav = pcmToWav(pcm)
   const url = URL.createObjectURL(wav)
   const audio = new Audio(url)
@@ -64,7 +71,7 @@ export async function speakGoogle(text: string, apiKey: string, voiceName = 'Kor
   await new Promise<void>((resolve, reject) => {
     audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve() }
     audio.onerror = (e) => { URL.revokeObjectURL(url); currentAudio = null; reject(e) }
-    audio.play()
+    audio.play().catch(reject)
   })
 }
 
