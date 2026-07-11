@@ -1,28 +1,7 @@
-import { useState, useEffect, useMemo, type ReactNode } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import type { Section, ElementKey } from '../types.ts'
 import { backgrounds } from '../constants.ts'
-
-function speak(text: string, rate = 0.9, voice: SpeechSynthesisVoice | null = null) {
-  window.speechSynthesis.cancel()
-  const utter = new SpeechSynthesisUtterance(text)
-  const isArabic = /[\u0600-\u06FF]/.test(text)
-  utter.lang = isArabic ? 'ar-SA' : 'en-US'
-  utter.rate = isArabic ? 1 : rate
-  if (isArabic && voice) utter.voice = voice
-  window.speechSynthesis.speak(utter)
-}
-
-function speakSequential(texts: string[], rate = 0.9, arVoice: SpeechSynthesisVoice | null = null) {
-  window.speechSynthesis.cancel()
-  texts.forEach((text) => {
-    const utter = new SpeechSynthesisUtterance(text)
-    const isArabic = /[\u0600-\u06FF]/.test(text)
-    utter.lang = isArabic ? 'ar-SA' : 'en-US'
-    utter.rate = isArabic ? 1 : rate
-    if (isArabic && arVoice) utter.voice = arVoice
-    window.speechSynthesis.speak(utter)
-  })
-}
+import { useSpeech } from '../utils/useSpeech.ts'
 
 type Slide = { sectionIdx: number; type: 'translation' | 'sentence'; section: Section }
 
@@ -31,7 +10,7 @@ interface PreviewPanelProps {
   selectedElement: ElementKey | null
   setSelectedElement: (key: ElementKey | null) => void
   changeSize: (key: ElementKey, delta: number) => void
-  getSize: (key: ElementKey) => number
+  getSize: (k: ElementKey) => number
   setElementSizes: React.Dispatch<React.SetStateAction<Record<ElementKey, number>>>
   bgIndex: number
 }
@@ -55,37 +34,7 @@ export default function PreviewPanel({
   const [revealedCount, setRevealedCount] = useState(0)
   const [transition, setTransition] = useState('anim-fadeSlideUp')
   const [previewKey, setPreviewKey] = useState(0)
-  const [speechRate, setSpeechRate] = useState(0.9)
-  const [arVoices, setArVoices] = useState<SpeechSynthesisVoice[]>([])
-  const [arVoiceName, setArVoiceName] = useState('')
-
-  const loadVoices = () => {
-    const voices = window.speechSynthesis?.getVoices() ?? []
-    const ar = voices.filter(v => v.lang.startsWith('ar'))
-    if (ar.length > 0) {
-      setArVoices(ar)
-      setArVoiceName(prev => prev || ar[0].name)
-    }
-    return ar
-  }
-
-  useEffect(() => {
-    loadVoices()
-    window.speechSynthesis?.addEventListener('voiceschanged', loadVoices)
-    const forceLoad = () => {
-      const u = new SpeechSynthesisUtterance(' ')
-      u.volume = 0
-      window.speechSynthesis?.speak(u)
-      setTimeout(() => { window.speechSynthesis?.cancel(); loadVoices() }, 200)
-    }
-    document.addEventListener('click', forceLoad, { once: true })
-    return () => {
-      window.speechSynthesis?.removeEventListener('voiceschanged', loadVoices)
-      document.removeEventListener('click', forceLoad)
-    }
-  }, [])
-
-  const arVoice = arVoices.find(v => v.name === arVoiceName) ?? null
+  const { voices, selectedVoice, setSelectedVoice, selectedArVoice, setSelectedArVoice, speak, stop, isPlaying, playingId } = useSpeech()
 
   const slides = useMemo(() => {
     const result: Slide[] = []
@@ -97,15 +46,6 @@ export default function PreviewPanel({
   }, [sections])
 
   const maxIndex = slides.length - 1
-
-  useEffect(() => {
-    if (!presentMode || presentIndex < 0 || presentIndex > maxIndex) return
-    setRevealedCount(c => Math.max(c, presentIndex))
-    const { section: s, type } = slides[presentIndex]
-    setSelectedElement(type === 'translation' ? `translation-${s.id}` : `sentence-${s.id}`)
-    if (type === 'translation' && s.translation) speak(s.translation, speechRate, arVoice)
-    else if (type === 'sentence' && s.sentence) speak(s.sentence, speechRate, arVoice)
-  }, [presentMode, presentIndex, slides, maxIndex, speechRate, arVoice])
 
   const enterPresent = () => { setPresentMode(true); setPresentIndex(0); setRevealedCount(0) }
   const exitPresent = () => { setPresentMode(false); setPresentIndex(0); setRevealedCount(0) }
@@ -121,29 +61,6 @@ export default function PreviewPanel({
         <button onClick={() => selEl && setElementSizes((prev) => { const n = { ...prev }; delete n[selEl]; return n; })} className="text-white/40 hover:text-white text-xs ml-1 transition-all">Reset</button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 bg-white/5 rounded-2xl px-4 py-2.5 border border-white/[0.06]">
-        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5">
-          <span className="text-[10px] text-white/40 font-medium">EN</span>
-          <input type="range" min="0.2" max="1.5" step="0.1" value={speechRate}
-            onChange={e => setSpeechRate(+e.target.value)}
-            className="w-20 h-1 accent-emerald-400 cursor-pointer" />
-          <span className="text-emerald-400/80 text-[11px] w-7 text-center font-mono">{speechRate.toFixed(1)}x</span>
-        </div>
-        <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-1.5" onClick={loadVoices}>
-          <span className="text-[10px] text-white/40 font-medium">AR</span>
-          {arVoices.length > 0 ? (
-            <select value={arVoiceName} onChange={e => setArVoiceName(e.target.value)}
-              className="bg-transparent text-white text-[11px] rounded-md px-1.5 py-0.5 outline-none cursor-pointer border border-white/10 hover:border-white/25 transition-colors">
-              {arVoices.map(v => (
-                <option key={v.name} value={v.name} className="bg-gray-800 text-white">{v.name.replace(/Arabic.*$/, '').trim() || v.name}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="text-[11px] text-white/30">الصوت الافتراضي</span>
-          )}
-        </div>
-      </div>
-
       <div className="flex items-center gap-1.5 bg-white/5 rounded-xl px-3 py-1.5">
         <span className="text-[10px] text-white/40 font-medium mr-1">Transition</span>
         {transitions.map(t => (
@@ -154,6 +71,37 @@ export default function PreviewPanel({
         <span className="text-white/15 mx-0.5">|</span>
         <button onClick={() => setPreviewKey(k => k + 1)}
           className="text-[11px] px-2 py-0.5 rounded-md text-blue-300 hover:text-blue-200 hover:bg-white/10 transition-all">▶ Preview</button>
+      </div>
+
+      <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-1.5">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/40"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+        <select
+          value={selectedVoice}
+          onChange={(e) => setSelectedVoice(e.target.value)}
+          className="text-[11px] bg-white/10 text-white rounded-md px-2 py-0.5 border border-white/20 focus:outline-none focus:border-blue-400 max-w-[180px]"
+        >
+          {voices.filter(v => v.lang.startsWith('en')).map(v => (
+            <option key={v.voiceURI} value={v.voiceURI} className="bg-gray-800 text-white">
+              {v.name} ({v.lang})
+            </option>
+          ))}
+        </select>
+        <span className="text-[10px] text-white/40 font-medium">AR</span>
+        <select
+          value={selectedArVoice}
+          onChange={(e) => setSelectedArVoice(e.target.value)}
+          className="text-[11px] bg-white/10 text-white rounded-md px-2 py-0.5 border border-white/20 focus:outline-none focus:border-blue-400 max-w-[180px]"
+        >
+          {voices.filter(v => v.lang.startsWith('ar')).map(v => (
+            <option key={v.voiceURI} value={v.voiceURI} className="bg-gray-800 text-white">
+              {v.name} ({v.lang})
+            </option>
+          ))}
+        </select>
+        {isPlaying && (
+          <button onClick={stop}
+            className="text-[11px] px-2 py-0.5 rounded-md text-red-300 hover:bg-red-500/20 transition-all">⏹ Stop</button>
+        )}
       </div>
 
       {!presentMode ? (
@@ -213,7 +161,7 @@ export default function PreviewPanel({
                 const items: ReactNode[] = []
                 if (s.title) {
                   items.push(
-                    <SectionTitle key={`title-${s.id}-${pk}`} section={s} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} speechRate={speechRate} arVoice={arVoice} cls={presentMode && sectionStart === presentIndex || previewTriggered ? transition : ''} />
+                    <SectionTitle key={`title-${s.id}-${pk}`} section={s} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} cls={presentMode && sectionStart === presentIndex || previewTriggered ? transition : ''} />
                   )
                 }
                 const visibleTypes = presentMode ? types.filter((_, ti) => sectionStart + ti <= revealedCount) : types
@@ -222,10 +170,10 @@ export default function PreviewPanel({
                   items.push(
                     <div key={`box-${s.id}-${pk}`} className="bg-white/[0.07] rounded-xl px-3 py-1.5 border border-white/10 flex flex-col gap-1.5">
                       {visibleTypes.includes('translation') && (
-                        <SectionItem section={s} type="translation" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} speechRate={speechRate} arVoice={arVoice} cls={presentMode && sectionStart + types.indexOf('translation') === presentIndex || previewTriggered ? transition : ''} />
+                        <SectionItem section={s} type="translation" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} cls={presentMode && sectionStart + types.indexOf('translation') === presentIndex || previewTriggered ? transition : ''} speak={speak} isPlaying={isPlaying} playingId={playingId} />
                       )}
                       {visibleTypes.includes('sentence') && (
-                        <SectionItem section={s} type="sentence" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} speechRate={speechRate} arVoice={arVoice} cls={presentMode && sectionStart + types.indexOf('sentence') === presentIndex || previewTriggered ? transition : ''} />
+                        <SectionItem section={s} type="sentence" selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} cls={presentMode && sectionStart + types.indexOf('sentence') === presentIndex || previewTriggered ? transition : ''} speak={speak} isPlaying={isPlaying} playingId={playingId} />
                       )}
                     </div>
                   )
@@ -235,7 +183,7 @@ export default function PreviewPanel({
                   <div key={`words-${s.id}-${pk}`} className="flex flex-col items-center gap-1">
                     <p className="text-[10px] text-white/30 font-medium">— تفكيك الجملة —</p>
                     {words.map(w => (
-                      <WordItem key={`${w.id}-${pk}`} word={w} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} speechRate={speechRate} arVoice={arVoice} />
+                      <WordItem key={`${w.id}-${pk}`} word={w} selectedElement={selEl} setSelectedElement={setSelectedElement} getSize={getSize} />
                     ))}
                   </div>
                 )
@@ -249,47 +197,69 @@ export default function PreviewPanel({
   )
 }
 
-function SectionTitle({ section: s, selectedElement, setSelectedElement, getSize, speechRate, arVoice, cls = '' }: {
-  section: Section; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; speechRate: number; arVoice: SpeechSynthesisVoice | null; cls?: string
+function SectionTitle({ section: s, selectedElement, setSelectedElement, getSize, cls = '' }: {
+  section: Section; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; cls?: string
 }) {
   const eKey = `title-${s.id}`
   const active = selectedElement === eKey
   return (
     <p className={`text-center font-bold transition-all cursor-pointer px-3 py-1 rounded-lg ${cls} ${active ? 'text-green-300 bg-green-500/15 ring-1 ring-green-400/40' : 'text-white/70'}`}
       style={{ fontSize: `${getSize(eKey) * 0.016}rem` }}
-      onClick={(e) => { e.stopPropagation(); setSelectedElement(eKey); speak(s.title, speechRate, arVoice) }}>{s.title}</p>
+      onClick={(e) => { e.stopPropagation(); setSelectedElement(eKey) }}>{s.title}</p>
   )
 }
 
-function SectionItem({ section: s, type, selectedElement, setSelectedElement, getSize, speechRate, arVoice, cls = '' }: {
-  section: Section; type: 'sentence' | 'translation'; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; speechRate: number; arVoice: SpeechSynthesisVoice | null; cls?: string
+function SectionItem({ section: s, type, selectedElement, setSelectedElement, getSize, cls = '', speak, isPlaying, playingId }: {
+  section: Section; type: 'sentence' | 'translation'; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; cls?: string; speak?: (text: string, id: string, lang?: 'en' | 'ar') => void; isPlaying?: boolean; playingId?: string | null
 }) {
   const text = type === 'sentence' ? s.sentence : s.translation
   if (!text) return null
   const eKey = `${type}-${s.id}`
   const active = selectedElement === eKey
   const isAr = type === 'translation'
+  const playId = `${type}-${s.id}`
+  const isCurrentlyPlaying = isPlaying && playingId === playId
   return (
-    <p className={`text-center leading-tight font-medium transition-all cursor-pointer rounded-lg ${cls} ${active ? 'text-green-300 bg-green-500/15 ring-1 ring-green-400/40' : isAr ? 'text-emerald-300/90' : 'text-white'}`}
-      style={{ fontSize: `${getSize(eKey) * (isAr ? 0.013 : 0.014)}rem` }}
-      onClick={(e) => { e.stopPropagation(); setSelectedElement(eKey); speak(text, speechRate, arVoice) }}>{text}</p>
+    <div className="relative group">
+      <p className={`text-center leading-tight font-medium transition-all cursor-pointer rounded-lg ${cls} ${active ? 'text-green-300 bg-green-500/15 ring-1 ring-green-400/40' : isAr ? 'text-emerald-300/90' : 'text-white'}`}
+        style={{ fontSize: `${getSize(eKey) * (isAr ? 0.013 : 0.014)}rem` }}
+        onClick={(e) => {
+          e.stopPropagation()
+          setSelectedElement(eKey)
+          if (speak) speak(text, playId, isAr ? 'ar' : 'en')
+        }}>{text}</p>
+      {speak && (
+        <button
+          onClick={(e) => { e.stopPropagation(); speak(text, playId, isAr ? 'ar' : 'en') }}
+          className={`absolute -left-1 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 ${
+            isCurrentlyPlaying 
+              ? 'bg-blue-500 text-white' 
+              : 'bg-white/20 text-white/70 hover:bg-white/30'
+          }`}
+        >
+          {isCurrentlyPlaying ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          )}
+        </button>
+      )}
+    </div>
   )
 }
 
-function WordItem({ word: w, selectedElement, setSelectedElement, getSize, speechRate, arVoice, cls = '' }: {
-  word: { id: string; en: string; ar: string }; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number; speechRate: number; arVoice: SpeechSynthesisVoice | null; cls?: string
+function WordItem({ word: w, selectedElement, setSelectedElement, getSize }: {
+  word: { id: string; en: string; ar: string }; selectedElement: ElementKey | null; setSelectedElement: (key: ElementKey | null) => void; getSize: (key: ElementKey) => number
 }) {
   const eKey = `word-${w.id}`
   const active = selectedElement === eKey
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 border transition-all cursor-pointer ${cls} ${
-        active
-          ? 'bg-green-500/15 border-green-400/40 ring-1 ring-green-400/40'
-          : 'bg-white/[0.06] border-white/10 hover:border-white/20'
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 border transition-all cursor-pointer ${
+        active ? 'bg-green-500/15 border-green-400/40 ring-1 ring-green-400/40' : 'bg-white/[0.06] border-white/10 hover:border-white/20'
       }`}
       style={{ fontSize: `${getSize(eKey) * 0.013}rem` }}
-      onClick={(e) => { e.stopPropagation(); setSelectedElement(eKey); speakSequential([w.en, w.ar], speechRate, arVoice) }}
+      onClick={(e) => { e.stopPropagation(); setSelectedElement(eKey) }}
     >
       <span className={`transition-colors ${active ? 'text-green-300' : 'text-white'}`}>{w.en}</span>
       <span className="text-gray-500"> = </span>

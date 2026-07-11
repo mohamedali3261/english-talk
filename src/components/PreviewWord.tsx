@@ -34,7 +34,7 @@ export default function PreviewWord({
       {...attributes}
       {...listeners}
       onClick={(e) => { e.stopPropagation(); onSelect(eWord) }}
-      className={`flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-3 cursor-grab active:cursor-grabing border transition-all ${selectedElement === eWord ? 'border-blue-400 ring-2 ring-blue-400' : 'border-white/5'}`}
+      className={`flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-3 cursor-grab active:cursor-grabbing border transition-all ${selectedElement === eWord ? 'border-blue-400 ring-2 ring-blue-400' : 'border-white/5'}`}
     >
       <span
         className="font-medium text-white transition-all"
