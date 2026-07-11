@@ -94,28 +94,6 @@ export default defineConfig({
             }
           }
 
-          if (req.url?.startsWith('/api/google-tts') && req.method === 'POST') {
-            const chunks = []
-            for await (const chunk of req) chunks.push(chunk)
-            const body = Buffer.concat(chunks)
-            const url = new URL(req.url, 'http://localhost')
-            const apiKey = url.searchParams.get('key') || ''
-            try {
-              const googleRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: body.toString(),
-              })
-              const data = await googleRes.text()
-              res.writeHead(googleRes.status, { 'Content-Type': 'application/json' })
-              res.end(data)
-            } catch (e) {
-              res.writeHead(500, { 'Content-Type': 'application/json' })
-              res.end(JSON.stringify({ error: { message: e.message } }))
-            }
-            return
-          }
-
           next()
         })
       },
