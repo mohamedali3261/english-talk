@@ -35,7 +35,7 @@ export const GOOGLE_VOICES = voices
 export async function speakGoogle(text: string, apiKey: string, voiceName = 'Kore'): Promise<void> {
   stopGoogleTts()
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-tts:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -52,10 +52,16 @@ export async function speakGoogle(text: string, apiKey: string, voiceName = 'Kor
       })
     }
   )
-  if (!res.ok) throw new Error(`Google TTS error: ${res.status}`)
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '')
+    throw new Error(`Google TTS ${res.status}: ${errText.slice(0, 200)}`)
+  }
   const data = await res.json()
   const audioB64 = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data
-  if (!audioB64) throw new Error('No audio in response')
+  if (!audioB64) {
+    console.error('Google TTS response:', JSON.stringify(data).slice(0, 500))
+    throw new Error('No audio in response')
+  }
   const pcm = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0)).buffer
   const wav = pcmToWav(pcm)
   const url = URL.createObjectURL(wav)
