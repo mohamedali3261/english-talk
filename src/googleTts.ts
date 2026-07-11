@@ -33,24 +33,28 @@ const voices = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'A
 export const GOOGLE_VOICES = voices
 
 async function fetchTts(text: string, apiKey: string, voiceName: string): Promise<ArrayBuffer> {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName }
-            }
-          }
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text }] }],
+    generationConfig: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName }
         }
-      })
+      }
     }
-  )
+  })
+
+  const isDev = location.hostname === 'localhost'
+  const url = isDev
+    ? `/api/google-tts?key=${apiKey}`
+    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => null)
     const msg = err?.error?.message || res.statusText
